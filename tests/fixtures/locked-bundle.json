@@ -1,0 +1,312 @@
+{
+  "stateId": "7954eab0a481ff1e3c2afab86e21e622b0afad1fabb1743ac0f2fcaf02b6e3ea",
+  "previousStateId": null,
+  "kind": "current",
+  "currentRoundNumber": 2,
+  "protocolVersion": 22,
+  "consensusVersion": 22,
+  "stateBundleSchemaVersion": 3,
+  "httpApiVersion": 1,
+  "peerTransportVersion": 2,
+  "udpRelayVersion": 5,
+  "releaseVersion": "1.0.0",
+  "versionInfo": {
+    "softwareConsensusVersion": 22,
+    "consensusVersion": 22,
+    "protocolVersion": 22,
+    "stateBundleSchemaVersion": 3,
+    "httpApiVersion": 1,
+    "peerTransportVersion": 2,
+    "udpRelayVersion": 5,
+    "releaseVersion": "1.0.0",
+    "hasAnyVersion": true
+  },
+  "networkId": "testnet",
+  "lockedByBlockHash": "0000000000000000000000000000000000000000000000000000000000b02201",
+  "lockedByBlockHeight": 945001,
+  "parentBlockHash": null,
+  "parentBlockHeight": null,
+  "createdAtUtc": "2026-10-02T21:51:32.3525879Z",
+  "totalDifficulty": 7.190886491871174E-08,
+  "activeSnapshotId": "7954eab0a481ff1e3c2afab86e21e622b0afad1fabb1743ac0f2fcaf02b6e3ea",
+  "paidSnapshotId": "",
+  "activeSnapshotProofIds": [
+    "537c2cdb8dffd914b099b7a83423cafea4ede16152d42d6600272b89a5537c5f"
+  ],
+  "paidSnapshotProofIds": [
+    "5ce703e346ed8dc65516d8d624c6184e199833f80a78006163b140a121cd8c67"
+  ],
+  "supportFeeEnabled": false,
+  "payoutVariant": "fee-free:shared=1:snapshot=1:reserve=3",
+  "validParentBlockHashes": [
+    "0000000000000000000000000000000000000000000000000000000000b02201",
+    "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643"
+  ],
+  "winnersList": [
+    {
+      "value": 156250000,
+      "address": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "difficulty": 7.190886491871174E-08,
+      "diffString": "0.00"
+    }
+  ],
+  "proofWinnersList": [],
+  "shareProofs": [
+    {
+      "shareId": "537c2cdb8dffd914b099b7a83423cafea4ede16152d42d6600272b89a5537c5f",
+      "minerAddress": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "scriptPubKeyHex": "0014c64b1b9283ba1ea86bb9e7b696b0c8f68dad0400",
+      "headerHex": "00804f274316faab82b814ce8aaf929ace20c0d52a8dc9479d02020000000000000000002e0c639c7934a697d14a314cea5da30f0c45660248d534db3cfb2036b5ac0d8a65a6e3696913021750000000",
+      "coinbaseHex": "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2003e16d0e13426f6f742070726f746f636f6c0f626f6f74000709921015000000ffffffff06128e120000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad040004cc041000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad04000000000000000000106a0e9113b1ccf00d0000000000b9bb1952ad8b02000000001600141ba063a60ffe85ee2034c3044d7ef087a5f20f910000000000000000036a01000000000000000000266a24aa21a9edcddc611f6111ea75c5a265fba065e8eccb3d1ec8f954c738ea4586b3fffab1ce00000000",
+      "merklePath": [
+        "b6c40a03e40f9f35ff1a47dfc044a0b82dced05867abda7a3d77476f8d76ca8c",
+        "e8474aac0f34d17bec62afaa624ebe64b36f9ce951daca4205dfcbb3061ce1a2",
+        "e93d732b034381c7746dfb0a83ff7396336f8dd454fe5a7c7999f80e8c15b2d7",
+        "0276e88a8933b31dc3f8b517bae033e18416754cca5f838320b6d3ab89be7b69",
+        "254f86497567f0acd39d3a31948258459505bb0634fec20a27c6d7af3a3781c8",
+        "fc970819c5af1e177e882851fe7c07b8206213422322d8571c51a9ef87a8d2e5",
+        "1461f6060b70b6079c7b30ca17b0dde6657704da86b88e61844be9936be5157b"
+      ],
+      "payoutSnapshotId": "seed-current",
+      "prevBlockHash": "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643",
+      "difficulty": 7.190886491871174E-08,
+      "diffString": "0.00",
+      "source": "test-seed",
+      "timestamp": "2026-10-02T21:51:32.3485411Z",
+      "proofClass": "work",
+      "relayStage": "validated",
+      "relayTtl": 0,
+      "transportReceivedUtc": null,
+      "stateServiceReceivedUtc": null,
+      "difficultyCheckedUtc": null,
+      "validationCompletedUtc": null,
+      "stateMutationCompletedUtc": null
+    }
+  ],
+  "workSetProofs": [
+    {
+      "shareId": "537c2cdb8dffd914b099b7a83423cafea4ede16152d42d6600272b89a5537c5f",
+      "minerAddress": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "scriptPubKeyHex": "0014c64b1b9283ba1ea86bb9e7b696b0c8f68dad0400",
+      "headerHex": "00804f274316faab82b814ce8aaf929ace20c0d52a8dc9479d02020000000000000000002e0c639c7934a697d14a314cea5da30f0c45660248d534db3cfb2036b5ac0d8a65a6e3696913021750000000",
+      "coinbaseHex": "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2003e16d0e13426f6f742070726f746f636f6c0f626f6f74000709921015000000ffffffff06128e120000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad040004cc041000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad04000000000000000000106a0e9113b1ccf00d0000000000b9bb1952ad8b02000000001600141ba063a60ffe85ee2034c3044d7ef087a5f20f910000000000000000036a01000000000000000000266a24aa21a9edcddc611f6111ea75c5a265fba065e8eccb3d1ec8f954c738ea4586b3fffab1ce00000000",
+      "merklePath": [
+        "b6c40a03e40f9f35ff1a47dfc044a0b82dced05867abda7a3d77476f8d76ca8c",
+        "e8474aac0f34d17bec62afaa624ebe64b36f9ce951daca4205dfcbb3061ce1a2",
+        "e93d732b034381c7746dfb0a83ff7396336f8dd454fe5a7c7999f80e8c15b2d7",
+        "0276e88a8933b31dc3f8b517bae033e18416754cca5f838320b6d3ab89be7b69",
+        "254f86497567f0acd39d3a31948258459505bb0634fec20a27c6d7af3a3781c8",
+        "fc970819c5af1e177e882851fe7c07b8206213422322d8571c51a9ef87a8d2e5",
+        "1461f6060b70b6079c7b30ca17b0dde6657704da86b88e61844be9936be5157b"
+      ],
+      "payoutSnapshotId": "seed-current",
+      "prevBlockHash": "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643",
+      "difficulty": 7.190886491871174E-08,
+      "diffString": "0.00",
+      "source": "test-seed",
+      "timestamp": "2026-10-02T21:51:32.3485411Z",
+      "proofClass": "work",
+      "relayStage": "validated",
+      "relayTtl": 0,
+      "transportReceivedUtc": null,
+      "stateServiceReceivedUtc": null,
+      "difficultyCheckedUtc": null,
+      "validationCompletedUtc": null,
+      "stateMutationCompletedUtc": null
+    },
+    {
+      "shareId": "5ce703e346ed8dc65516d8d624c6184e199833f80a78006163b140a121cd8c67",
+      "minerAddress": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+      "scriptPubKeyHex": "0014c64b1b9283ba1ea86bb9e7b696b0c8f68dad0400",
+      "headerHex": "00804f274316faab82b814ce8aaf929ace20c0d52a8dc9479d02020000000000000000002e0c639c7934a697d14a314cea5da30f0c45660248d534db3cfb2036b5ac0d8a65a6e3696913021785000000",
+      "coinbaseHex": "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2003e16d0e13426f6f742070726f746f636f6c0f626f6f74000709921015000000ffffffff06128e120000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad040004cc041000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad04000000000000000000106a0e9113b1ccf00d0000000000b9bb1952ad8b02000000001600141ba063a60ffe85ee2034c3044d7ef087a5f20f910000000000000000036a01000000000000000000266a24aa21a9edcddc611f6111ea75c5a265fba065e8eccb3d1ec8f954c738ea4586b3fffab1ce00000000",
+      "merklePath": [
+        "b6c40a03e40f9f35ff1a47dfc044a0b82dced05867abda7a3d77476f8d76ca8c",
+        "e8474aac0f34d17bec62afaa624ebe64b36f9ce951daca4205dfcbb3061ce1a2",
+        "e93d732b034381c7746dfb0a83ff7396336f8dd454fe5a7c7999f80e8c15b2d7",
+        "0276e88a8933b31dc3f8b517bae033e18416754cca5f838320b6d3ab89be7b69",
+        "254f86497567f0acd39d3a31948258459505bb0634fec20a27c6d7af3a3781c8",
+        "fc970819c5af1e177e882851fe7c07b8206213422322d8571c51a9ef87a8d2e5",
+        "1461f6060b70b6079c7b30ca17b0dde6657704da86b88e61844be9936be5157b"
+      ],
+      "payoutSnapshotId": "seed-current",
+      "prevBlockHash": "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643",
+      "difficulty": 2.339136934256014E-10,
+      "diffString": "0.00",
+      "source": "test-seed",
+      "timestamp": "2026-10-02T21:51:32.3493235Z",
+      "proofClass": "work",
+      "relayStage": "validated",
+      "relayTtl": 0,
+      "transportReceivedUtc": null,
+      "stateServiceReceivedUtc": null,
+      "difficultyCheckedUtc": null,
+      "validationCompletedUtc": null,
+      "stateMutationCompletedUtc": null
+    }
+  ],
+  "snapshotContexts": [
+    {
+      "snapshotId": "7954eab0a481ff1e3c2afab86e21e622b0afad1fabb1743ac0f2fcaf02b6e3ea",
+      "familyId": "511e89d7ed4a8b0e1a820664759f00d89cd1d6eb7644d54187b4fca3cc7d90da",
+      "previousSnapshotId": "seed-current",
+      "currentRoundNumber": 2,
+      "lockedByBlockHash": "0000000000000000000000000000000000000000000000000000000000b02201",
+      "lockedByBlockHeight": 945001,
+      "createdAtUtc": "2026-10-02T21:51:32.3525879Z",
+      "supportFeeEnabled": false,
+      "payoutVariant": "fee-free:shared=1:snapshot=1:reserve=3",
+      "proofIds": [
+        "537c2cdb8dffd914b099b7a83423cafea4ede16152d42d6600272b89a5537c5f"
+      ],
+      "winnersList": [
+        {
+          "value": 156250000,
+          "address": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+          "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+          "difficulty": 7.190886491871174E-08,
+          "diffString": "0.00"
+        }
+      ],
+      "feeFreeWinnersList": [
+        {
+          "value": 156250000,
+          "address": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+          "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+          "difficulty": 7.190886491871174E-08,
+          "diffString": "0.00"
+        }
+      ]
+    },
+    {
+      "snapshotId": "seed-current",
+      "familyId": "",
+      "previousSnapshotId": "",
+      "currentRoundNumber": 1,
+      "lockedByBlockHash": "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643",
+      "lockedByBlockHeight": 945000,
+      "createdAtUtc": "2026-10-02T21:51:32.351234Z",
+      "supportFeeEnabled": false,
+      "payoutVariant": "",
+      "proofIds": [],
+      "winnersList": [
+        {
+          "value": 268749828,
+          "address": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+          "username": "",
+          "difficulty": 0,
+          "diffString": "0"
+        },
+        {
+          "value": 42708306,
+          "address": "bc1qrwsx8fs0l6z7ugp5cvzy6lhss7jlyru3kg9s8y",
+          "username": "",
+          "difficulty": 0,
+          "diffString": "0"
+        }
+      ],
+      "feeFreeWinnersList": [
+        {
+          "value": 268749828,
+          "address": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+          "username": "",
+          "difficulty": 0,
+          "diffString": "0"
+        },
+        {
+          "value": 42708306,
+          "address": "bc1qrwsx8fs0l6z7ugp5cvzy6lhss7jlyru3kg9s8y",
+          "username": "",
+          "difficulty": 0,
+          "diffString": "0"
+        }
+      ]
+    }
+  ],
+  "commitment": {
+    "protocolVersion": 22,
+    "networkId": "testnet",
+    "nextStateId": "780b22938924bb63b3213b504a37d58f97bf9b0940fc123d7f363c9cb90e2547",
+    "onChainSupported": false,
+    "tagPreview": "BOOT|v22|testnet|780b22938924bb63",
+    "supportNote": "Per-round on-chain commitments require miner-side template support. The server computes state IDs now, but DATUM/Hydrapool must expose a dynamic coinbase hook before this can be embedded on-chain."
+  },
+  "snapshotFamilyMember": {
+    "familyId": "511e89d7ed4a8b0e1a820664759f00d89cd1d6eb7644d54187b4fca3cc7d90da",
+    "consensusVersion": 22,
+    "networkId": "testnet|bitcoin=mainnet",
+    "predecessorSnapshotId": "seed-current",
+    "boundaryBlockHash": "0000000000000000000000000000000000000000000000000000000000b02201",
+    "boundaryBlockHeight": 945001,
+    "payoutVariant": "fee-free:shared=1:snapshot=1:reserve=3",
+    "snapshotId": "7954eab0a481ff1e3c2afab86e21e622b0afad1fabb1743ac0f2fcaf02b6e3ea",
+    "boundaryReserveProofs": [
+      {
+        "shareId": "537c2cdb8dffd914b099b7a83423cafea4ede16152d42d6600272b89a5537c5f",
+        "minerAddress": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+        "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+        "scriptPubKeyHex": "0014c64b1b9283ba1ea86bb9e7b696b0c8f68dad0400",
+        "headerHex": "00804f274316faab82b814ce8aaf929ace20c0d52a8dc9479d02020000000000000000002e0c639c7934a697d14a314cea5da30f0c45660248d534db3cfb2036b5ac0d8a65a6e3696913021750000000",
+        "coinbaseHex": "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2003e16d0e13426f6f742070726f746f636f6c0f626f6f74000709921015000000ffffffff06128e120000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad040004cc041000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad04000000000000000000106a0e9113b1ccf00d0000000000b9bb1952ad8b02000000001600141ba063a60ffe85ee2034c3044d7ef087a5f20f910000000000000000036a01000000000000000000266a24aa21a9edcddc611f6111ea75c5a265fba065e8eccb3d1ec8f954c738ea4586b3fffab1ce00000000",
+        "merklePath": [
+          "b6c40a03e40f9f35ff1a47dfc044a0b82dced05867abda7a3d77476f8d76ca8c",
+          "e8474aac0f34d17bec62afaa624ebe64b36f9ce951daca4205dfcbb3061ce1a2",
+          "e93d732b034381c7746dfb0a83ff7396336f8dd454fe5a7c7999f80e8c15b2d7",
+          "0276e88a8933b31dc3f8b517bae033e18416754cca5f838320b6d3ab89be7b69",
+          "254f86497567f0acd39d3a31948258459505bb0634fec20a27c6d7af3a3781c8",
+          "fc970819c5af1e177e882851fe7c07b8206213422322d8571c51a9ef87a8d2e5",
+          "1461f6060b70b6079c7b30ca17b0dde6657704da86b88e61844be9936be5157b"
+        ],
+        "payoutSnapshotId": "seed-current",
+        "prevBlockHash": "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643",
+        "difficulty": 7.190886491871174E-08,
+        "diffString": "0.00",
+        "source": "test-seed",
+        "timestamp": "2026-10-02T21:51:32.3485411Z",
+        "proofClass": "work",
+        "relayStage": "validated",
+        "relayTtl": 0,
+        "transportReceivedUtc": null,
+        "stateServiceReceivedUtc": null,
+        "difficultyCheckedUtc": null,
+        "validationCompletedUtc": null,
+        "stateMutationCompletedUtc": null
+      },
+      {
+        "shareId": "5ce703e346ed8dc65516d8d624c6184e199833f80a78006163b140a121cd8c67",
+        "minerAddress": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+        "username": "bc1qce93hy5rhg02s6aeu7mfdvxg76x66pqqtrvzs3",
+        "scriptPubKeyHex": "0014c64b1b9283ba1ea86bb9e7b696b0c8f68dad0400",
+        "headerHex": "00804f274316faab82b814ce8aaf929ace20c0d52a8dc9479d02020000000000000000002e0c639c7934a697d14a314cea5da30f0c45660248d534db3cfb2036b5ac0d8a65a6e3696913021785000000",
+        "coinbaseHex": "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff2003e16d0e13426f6f742070726f746f636f6c0f626f6f74000709921015000000ffffffff06128e120000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad040004cc041000000000160014c64b1b9283ba1ea86bb9e7b696b0c8f68dad04000000000000000000106a0e9113b1ccf00d0000000000b9bb1952ad8b02000000001600141ba063a60ffe85ee2034c3044d7ef087a5f20f910000000000000000036a01000000000000000000266a24aa21a9edcddc611f6111ea75c5a265fba065e8eccb3d1ec8f954c738ea4586b3fffab1ce00000000",
+        "merklePath": [
+          "b6c40a03e40f9f35ff1a47dfc044a0b82dced05867abda7a3d77476f8d76ca8c",
+          "e8474aac0f34d17bec62afaa624ebe64b36f9ce951daca4205dfcbb3061ce1a2",
+          "e93d732b034381c7746dfb0a83ff7396336f8dd454fe5a7c7999f80e8c15b2d7",
+          "0276e88a8933b31dc3f8b517bae033e18416754cca5f838320b6d3ab89be7b69",
+          "254f86497567f0acd39d3a31948258459505bb0634fec20a27c6d7af3a3781c8",
+          "fc970819c5af1e177e882851fe7c07b8206213422322d8571c51a9ef87a8d2e5",
+          "1461f6060b70b6079c7b30ca17b0dde6657704da86b88e61844be9936be5157b"
+        ],
+        "payoutSnapshotId": "seed-current",
+        "prevBlockHash": "00000000000000000002029d47c98d2ad5c020ce9a92af8ace14b882abfa1643",
+        "difficulty": 2.339136934256014E-10,
+        "diffString": "0.00",
+        "source": "test-seed",
+        "timestamp": "2026-10-02T21:51:32.3493235Z",
+        "proofClass": "work",
+        "relayStage": "validated",
+        "relayTtl": 0,
+        "transportReceivedUtc": null,
+        "stateServiceReceivedUtc": null,
+        "difficultyCheckedUtc": null,
+        "validationCompletedUtc": null,
+        "stateMutationCompletedUtc": null
+      }
+    ]
+  }
+}

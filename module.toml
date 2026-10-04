@@ -1,0 +1,14 @@
+name = "blvm-gridpool"
+version = "0.1.0"
+description = "GridPool consensus 22 module. Does not replace Commons getblocktemplate."
+author = "Bitcoin Commons Contributors"
+entry_point = "blvm-gridpool"
+
+capabilities = [
+    "read_blockchain",
+    "subscribe_events",
+    "submit_block",
+    "register_module_api",
+    "call_module",
+    "write_storage",
+]
