@@ -14,9 +14,11 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 
 use crate::bitcoin::display_hash;
-use crate::job::{canon_after_local_block, published_job, Canon};
+use crate::follow::{
+    absorb_poll, apply_poll, load_config, load_state, poll_open_hold, save_state, Follower,
+};
+use crate::job::{canon_after_local_block, published_job};
 use crate::peer::{NetworkSummary, PeerBooks, PeerServer};
-use crate::reconcile::ShareProof;
 
 use self::api::GridPoolApi;
 
@@ -28,14 +30,12 @@ pub struct GridPoolModule {
 }
 
 pub struct GridState {
-    pub canon: Canon,
-    pub published: Vec<ShareProof>,
-    pub canon_addresses: Vec<String>,
-    pub published_addresses: Vec<String>,
-    pub hold_closed: bool,
-    pub reserve_limit: usize,
+    pub held: Follower,
     pub summary: NetworkSummary,
     pub books: Arc<std::sync::Mutex<PeerBooks>>,
+    pub data_dir: PathBuf,
+    /// False when `state.json` could not be read. Do not overwrite that file.
+    pub persist: bool,
 }
 
 impl GridPoolModule {
@@ -43,32 +43,56 @@ impl GridPoolModule {
         data_dir: PathBuf,
         node_api: Arc<dyn blvm_node::module::traits::NodeAPI>,
     ) -> std::io::Result<Self> {
-        let summary = NetworkSummary::consensus_22("mainnet", "http://127.0.0.1");
+        let config = if data_dir.join("config.toml").exists() {
+            match load_config(&data_dir) {
+                Ok(config) => Some(config),
+                Err(error) => {
+                    tracing::warn!("gridpool config: {error}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let network = config
+            .as_ref()
+            .map(|config| config.network_id.as_str())
+            .filter(|network| !network.trim().is_empty())
+            .unwrap_or("mainnet");
+        let (mut held, persist) = match load_state(&data_dir) {
+            Ok(Some(loaded)) => (loaded, true),
+            Ok(None) => (Follower::fresh(network), true),
+            Err(error) => {
+                tracing::warn!("gridpool state: {error}");
+                (Follower::fresh(network), false)
+            }
+        };
+        crate::follow::apply_saved_config(&mut held, config.as_ref());
+        let snapshot = held.clone();
+        let polled = std::thread::spawn(move || poll_open_hold(&snapshot)).join();
+        if let Ok(result) = polled {
+            absorb_poll(&mut held, result);
+        }
+        let mut summary = NetworkSummary::consensus_22(&held.network_id, "http://127.0.0.1");
+        summary.current_tip_block_hash = held.tip_hash.clone();
+        summary.current_tip_block_height = held.tip_height;
+        summary.current_state_id = held.current_state_id.clone();
+        summary.candidate_state_id = held.candidate_state_id.clone();
         let books = Arc::new(std::sync::Mutex::new(PeerBooks {
             summary: summary.clone(),
             bundles: std::collections::HashMap::new(),
         }));
         let server = PeerServer::spawn(Arc::clone(&books))?;
-        let _ = data_dir;
+        let mut state = GridState {
+            held,
+            summary,
+            books,
+            data_dir,
+            persist,
+        };
+        publish_summary_and_save(&mut state);
         Ok(Self {
-            state: Arc::new(RwLock::new(GridState {
-                canon: Canon {
-                    proofs: Vec::new(),
-                    header_parent: String::new(),
-                },
-                published: Vec::new(),
-                canon_addresses: Vec::new(),
-                published_addresses: Vec::new(),
-                hold_closed: false,
-                reserve_limit: crate::family::work_set_reserve_limit(
-                    crate::family::snapshot_proof_slot_count(
-                        crate::family::REFERENCE_WINNERS_LIST_SIZE,
-                    ),
-                    crate::family::REFERENCE_RESERVE_MULTIPLIER,
-                ) as usize,
-                summary,
-                books,
-            })),
+            state: Arc::new(RwLock::new(state)),
             node_api,
             _server: Arc::new(std::sync::Mutex::new(server)),
         })
@@ -93,18 +117,79 @@ impl GridPoolModule {
         }
         let parent = display_hash(&block_hash[..]);
         let mut state = self.state.write().await;
-        state.canon = canon_after_local_block(&state.canon.proofs, &parent);
-        state.summary.current_tip_block_hash = parent;
-        state.summary.current_tip_block_height = height as i64;
-        let job = published_job(state.hold_closed, &state.published, &state.canon);
-        if state.hold_closed {
-            state.published = job.proofs;
-            state.published_addresses = state.canon_addresses.clone();
+        state.held.canon = canon_after_local_block(&state.held.canon.proofs, &parent);
+        state.held.tip_hash = parent.clone();
+        state.held.tip_height = height as i64;
+        if !parent.is_empty() && !state.held.parents.iter().any(|known| known == &parent) {
+            state.held.parents.push(parent);
         }
-        if let Ok(mut books) = state.books.lock() {
-            books.summary = state.summary.clone();
+        let job = published_job(
+            state.held.hold_closed,
+            &state.held.published,
+            &state.held.canon,
+        );
+        if state.held.hold_closed {
+            state.held.published = job.proofs;
+            state.held.published_addresses = state.held.canon_addresses.clone();
         }
+        publish_summary_and_save(&mut state);
         Ok(())
+    }
+
+    async fn poll_sibling(&self) {
+        let snapshot = {
+            let state = self.state.read().await;
+            state.held.clone()
+        };
+        if snapshot.hold_closed || snapshot.peer_url.trim().is_empty() {
+            return;
+        }
+        let polled = tokio::task::spawn_blocking(move || poll_open_hold(&snapshot)).await;
+        let outcome = match polled {
+            Ok(Ok(Some(outcome))) => outcome,
+            Ok(Ok(None)) => return,
+            Ok(Err(error)) => {
+                tracing::warn!("gridpool poll: {error}");
+                return;
+            }
+            Err(error) => {
+                tracing::warn!("gridpool poll thread: {error}");
+                return;
+            }
+        };
+        let mut state = self.state.write().await;
+        if state.held.hold_closed {
+            return;
+        }
+        if apply_poll(&mut state.held, &outcome) {
+            publish_summary_and_save(&mut state);
+        }
+    }
+}
+
+fn publish_summary_and_save(state: &mut GridState) {
+    state.summary.network_id = state.held.network_id.clone();
+    state.summary.current_tip_block_hash = state.held.tip_hash.clone();
+    state.summary.current_tip_block_height = state.held.tip_height;
+    state.summary.current_state_id = state.held.current_state_id.clone();
+    state.summary.candidate_state_id = state.held.candidate_state_id.clone();
+    state.summary.winners_count = state.held.winners.len() as i32;
+    state.summary.on_deck_count = state.held.on_deck.len() as i32;
+    state.summary.current_state_proof_count = state.held.canon.proofs.len() as i32;
+    state.summary.current_state_total_difficulty = state
+        .held
+        .canon
+        .proofs
+        .iter()
+        .map(|proof| proof.difficulty)
+        .sum();
+    if let Ok(mut books) = state.books.lock() {
+        books.summary = state.summary.clone();
+    }
+    if state.persist {
+        if let Err(error) = save_state(&state.data_dir, &state.held) {
+            tracing::warn!("gridpool state: {error}");
+        }
     }
 }
 
@@ -124,7 +209,9 @@ impl GridPoolModule {
                 "gridpool node api missing".into(),
             ));
         };
-        self.note_block(block_hash, height, &api).await
+        self.note_block(block_hash, height, &api).await?;
+        self.poll_sibling().await;
+        Ok(())
     }
 
     #[command]
@@ -136,9 +223,9 @@ impl GridPoolModule {
         Ok(format!(
             "consensus={} parent={} reserve={} published={}\n",
             state.summary.consensus_version,
-            state.canon.header_parent,
-            state.canon.proofs.len(),
-            state.published.len()
+            state.held.canon.header_parent,
+            state.held.canon.proofs.len(),
+            state.held.published.len()
         ))
     }
 
@@ -154,8 +241,8 @@ impl GridPoolModule {
             .map_err(|_| ModuleError::OperationError("gridpool busy".into()))?;
         Ok(serde_json::json!({
             "consensus_version": state.summary.consensus_version,
-            "header_parent": state.canon.header_parent,
-            "reserve": state.canon.proofs.len(),
+            "header_parent": state.held.canon.header_parent,
+            "reserve": state.held.canon.proofs.len(),
         }))
     }
 }

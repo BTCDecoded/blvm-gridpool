@@ -4,9 +4,11 @@
 //! is only read. A later sibling updates canon through `reconcile`, not here.
 //! The header parent during a hold is the new locally validated block.
 
+use serde::{Deserialize, Serialize};
+
 use crate::reconcile::{reconcile, ShareProof};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub struct Canon {
     pub proofs: Vec<ShareProof>,
     pub header_parent: String,

@@ -5,6 +5,7 @@
 
 use std::cmp::Ordering;
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::bitcoin::{
@@ -19,7 +20,7 @@ pub const HTTP_API_VERSION: i32 = 1;
 pub const STATE_BUNDLE_SCHEMA_VERSION: i32 = 3;
 pub const PEER_TRANSPORT_VERSION: i32 = 2;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DeckProof {
     pub share_id: String,
     pub difficulty: f64,
@@ -32,7 +33,7 @@ pub struct DeckProof {
     pub merkle_path: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WinnerRow {
     pub value_sats: u64,
     pub address: String,

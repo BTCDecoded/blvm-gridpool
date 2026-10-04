@@ -2,6 +2,7 @@
 //!
 //! Support rules live inside the payout-variant string. There is no second support field.
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// `develop` tip confirmed at implementation time. Fourteen commits ahead of `v0.2.2-beta.2`.
@@ -20,7 +21,7 @@ pub const REFERENCE_SUPPORT_FEE_ENABLED: bool = true;
 /// `PoolConfig.WorkSetReserveMultiplier` default on the pin.
 pub const REFERENCE_RESERVE_MULTIPLIER: i32 = 3;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FamilyId(pub String);
 
 pub fn compute_family_id(
@@ -44,7 +45,7 @@ pub fn compute_family_id(
 }
 
 /// Local family a member is compared against. Field names follow `BootSnapshotFamilyState`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FamilyState {
     pub family_id: FamilyId,
     pub consensus_version: i32,

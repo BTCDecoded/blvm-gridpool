@@ -5,7 +5,9 @@
 
 use std::cmp::Ordering;
 
-#[derive(Clone, Debug, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ShareProof {
     pub share_id: String,
     pub difficulty: f64,

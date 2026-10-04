@@ -2,12 +2,14 @@
 //!
 //! Pinned to boot-protocol `develop` `be0f0b165181616b1b757c27219ed07a9f017e8c`
 //! (2026-09-13). The pin is a constant, not a branch followed at build time.
-//! This crate does not publish miner jobs and does not register a node hook.
+//! Stratum asks this module for coinbase rows when Commons is not loaded.
+//! `getblocktemplate` stays on Commons.
 
 mod adopt;
 mod bitcoin;
 mod boundary;
 mod family;
+mod follow;
 mod import;
 mod job;
 mod members;
@@ -33,6 +35,10 @@ pub use family::{
     CONSENSUS_VERSION, DEVELOP_PIN, FAMILY_DOMAIN, REFERENCE_RESERVE_MULTIPLIER,
     REFERENCE_SUPPORT_FEE_ENABLED, REFERENCE_WINNERS_LIST_SIZE,
 };
+pub use follow::{
+    absorb_poll, apply_poll, apply_saved_config, load_config, load_state, peer_address,
+    poll_open_hold, save_state, Follower, GridPoolConfig,
+};
 pub use import::{
     bootstrap_current, can_sync_state, compute_candidate_state_id, compute_state_id,
     import_candidate, import_locked_sibling, merge_candidate_reserve, parent_sets_overlap,
@@ -46,8 +52,8 @@ pub use job::{
 };
 pub use members::{try_retain_member_id, MAX_RETAINED_MEMBER_SNAPSHOT_IDS};
 pub use payout::{
-    assign_slots, coinbase_outputs, shared_slot_value_sats, slot0_value_sats, CoinbaseRow,
-    PayoutSlots,
+    assign_slots, coinbase_job, coinbase_outputs, shared_slot_value_sats, slot0_value_sats,
+    CoinbaseRow, PayoutSlots,
 };
 pub use peer::{
     decks_of, http_get, poll_peer, BundleProof, LocalSync, NetworkSummary, PeerBooks, PeerServer,

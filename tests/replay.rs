@@ -421,6 +421,8 @@ fn unchanged(local: &LocalSync) -> PollOutcome {
         winners: local.winners.clone(),
         reconciled: local.reconciled.clone(),
         on_deck: local.on_deck.clone(),
+        family: local.family.clone(),
+        paid_ids: local.paid_ids.clone(),
     }
 }
 

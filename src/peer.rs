@@ -334,6 +334,10 @@ pub struct PollOutcome {
     pub winners: Vec<WinnerRow>,
     pub reconciled: Vec<ShareProof>,
     pub on_deck: Vec<DeckProof>,
+    /// Family member of the current bundle when bootstrap or adopt ran.
+    pub family: Option<FamilyState>,
+    /// Paid ids of that same bundle. A poll that does not adopt keeps the local list.
+    pub paid_ids: Vec<String>,
 }
 
 pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcome> {
@@ -344,6 +348,8 @@ pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcom
         winners: local.winners.clone(),
         reconciled: local.reconciled.clone(),
         on_deck: local.on_deck.clone(),
+        family: local.family.clone(),
+        paid_ids: local.paid_ids.clone(),
     };
     let (status, body) = http_get(address, "/api/network/summary")?;
     if status != 200 {
@@ -362,8 +368,6 @@ pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcom
         return Ok(outcome);
     }
     let _ = http_get(address, "/api/network/peer-addresses?limit=10");
-    let mut on_deck_shares = local.on_deck_shares.clone();
-    let mut paid_ids = local.paid_ids.clone();
     if !remote.current_state_id.trim().is_empty()
         && !remote
             .current_state_id
@@ -401,13 +405,18 @@ pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcom
                         outcome.winners = winners;
                         outcome.on_deck = trimmed;
                         outcome.current_state_id = bundle.state_id.clone();
+                        remember_current_bundle(&mut outcome, &bundle);
                         bootstrapped = true;
                     }
                 }
                 if !bootstrapped {
-                    if let Some(adopted) =
-                        adopt_bundle(&bundle, local, &outcome, &on_deck_shares, &paid_ids)
-                    {
+                    if let Some(adopted) = adopt_bundle(
+                        &bundle,
+                        local,
+                        &outcome,
+                        &local.on_deck_shares,
+                        &local.paid_ids,
+                    ) {
                         match adopted {
                             AdoptOutcome::Unchanged => {}
                             AdoptOutcome::Reconciled {
@@ -420,13 +429,13 @@ pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcom
                                     &on_deck,
                                 );
                                 outcome.reconciled = reconciled;
-                                on_deck_shares = on_deck;
+                                outcome.winners = winner_rows(&bundle.winners_list);
                                 outcome.current_state_id = bundle.state_id.clone();
                             }
                         }
+                        remember_current_bundle(&mut outcome, &bundle);
                     }
                 }
-                paid_ids = bundle.paid_snapshot_proof_ids.clone();
             }
         }
     }
@@ -475,9 +484,26 @@ pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcom
             }
         }
     }
-    let _ = on_deck_shares;
-    let _ = paid_ids;
     Ok(outcome)
+}
+
+fn remember_current_bundle(outcome: &mut PollOutcome, bundle: &StateBundle) {
+    outcome.paid_ids = bundle.paid_snapshot_proof_ids.clone();
+    let Some(member) = bundle.snapshot_family_member.as_ref() else {
+        return;
+    };
+    if member.family_id.trim().is_empty() {
+        return;
+    }
+    outcome.family = Some(FamilyState {
+        family_id: FamilyId(member.family_id.clone()),
+        consensus_version: member.consensus_version,
+        network_id: member.network_id.clone(),
+        predecessor_snapshot_id: member.predecessor_snapshot_id.clone(),
+        boundary_block_hash: member.boundary_block_hash.clone(),
+        boundary_block_height: member.boundary_block_height,
+        payout_variant: member.payout_variant.clone(),
+    });
 }
 
 fn adopt_bundle(

@@ -9,8 +9,9 @@ use blvm_node::module::traits::{ModuleError, NodeAPI};
 use tokio::sync::RwLock;
 
 use super::GridState;
+use crate::follow::save_state;
 use crate::job::{job_after_payment, pay_published_list, published_job};
-use crate::payout::coinbase_outputs;
+use crate::payout::coinbase_job;
 use crate::reconcile::ShareProof;
 
 pub struct GridPoolApi {
@@ -35,48 +36,60 @@ impl ModuleAPI for GridPoolApi {
                         .map_err(|error| ModuleError::OperationError(error.to_string()))?
                 };
                 let state = self.state.read().await;
-                let job = published_job(state.hold_closed, &state.published, &state.canon);
-                let addresses = if state.hold_closed {
-                    &state.canon_addresses
+                let job = published_job(
+                    state.held.hold_closed,
+                    &state.held.published,
+                    &state.held.canon,
+                );
+                let addresses = if state.held.hold_closed {
+                    &state.held.canon_addresses
                 } else {
-                    &state.published_addresses
+                    &state.held.published_addresses
                 };
-                let support = request["support_address"].as_str();
-                let rows = coinbase_outputs(
+                let support = request["support_address"].as_str().map(str::to_string);
+                let mut body = coinbase_job(
                     addresses,
                     request["subsidy_sats"].as_u64().unwrap_or(312_500_000),
-                    request["fee_sats"].as_u64().unwrap_or(0),
                     request["total_slots"].as_u64().unwrap_or(300),
-                    support,
+                    support.as_deref(),
                     request["network"].as_str().unwrap_or("mainnet"),
                 )
-                .map_err(|error| ModuleError::OperationError(error))?;
-                serde_json::to_vec(&serde_json::json!({
-                    "header_parent": job.header_parent,
-                    "outputs": rows,
-                }))
-                .map_err(|error| ModuleError::OperationError(error.to_string()))
+                .map_err(ModuleError::OperationError)?;
+                body["header_parent"] = serde_json::json!(job.header_parent);
+                serde_json::to_vec(&body)
+                    .map_err(|error| ModuleError::OperationError(error.to_string()))
             }
             "gridpool_close_hold" => {
                 let mut state = self.state.write().await;
-                state.hold_closed = true;
-                let job = published_job(true, &state.published, &state.canon);
-                state.published = job.proofs;
-                state.published_addresses = state.canon_addresses.clone();
+                state.held.hold_closed = true;
+                let job = published_job(true, &state.held.published, &state.held.canon);
+                state.held.published = job.proofs;
+                state.held.published_addresses = state.held.canon_addresses.clone();
+                persist(&state);
                 serde_json::to_vec(&serde_json::json!({"hold_closed": true}))
                     .map_err(|error| ModuleError::OperationError(error.to_string()))
             }
             "gridpool_note_payment" => {
                 let mut state = self.state.write().await;
-                let remaining =
-                    pay_published_list(&state.canon.proofs, &state.published, state.reserve_limit);
-                state.canon_addresses =
-                    keep_addresses(&state.canon.proofs, &state.canon_addresses, &remaining);
-                state.canon.proofs = remaining.clone();
-                state.published_addresses =
-                    keep_addresses(&state.published, &state.published_addresses, &remaining);
-                state.published = job_after_payment(&remaining);
-                state.hold_closed = false;
+                let remaining = pay_published_list(
+                    &state.held.canon.proofs,
+                    &state.held.published,
+                    state.held.reserve_limit,
+                );
+                state.held.canon_addresses = keep_addresses(
+                    &state.held.canon.proofs,
+                    &state.held.canon_addresses,
+                    &remaining,
+                );
+                state.held.canon.proofs = remaining.clone();
+                state.held.published_addresses = keep_addresses(
+                    &state.held.published,
+                    &state.held.published_addresses,
+                    &remaining,
+                );
+                state.held.published = job_after_payment(&remaining);
+                state.held.hold_closed = false;
+                persist(&state);
                 serde_json::to_vec(&serde_json::json!({
                     "share_ids": remaining.iter().map(|proof| &proof.share_id).collect::<Vec<_>>(),
                 }))
@@ -94,8 +107,8 @@ impl ModuleAPI for GridPoolApi {
                 serde_json::to_vec(&serde_json::json!({
                     "consensus_version": state.summary.consensus_version,
                     "network_id": state.summary.network_id,
-                    "header_parent": state.canon.header_parent,
-                    "tip_height": state.summary.current_tip_block_height,
+                    "header_parent": state.held.canon.header_parent,
+                    "tip_height": state.held.tip_height,
                 }))
                 .map_err(|error| ModuleError::OperationError(error.to_string()))
             }
@@ -117,6 +130,14 @@ impl ModuleAPI for GridPoolApi {
 
     fn api_version(&self) -> u32 {
         1
+    }
+}
+
+fn persist(state: &super::GridState) {
+    if state.persist {
+        if let Err(error) = save_state(&state.data_dir, &state.held) {
+            tracing::warn!("gridpool state: {error}");
+        }
     }
 }
 

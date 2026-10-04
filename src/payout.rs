@@ -26,7 +26,14 @@ pub fn slot0_value_sats(subsidy_sats: u64, fee_sats: u64, total_slots: u64) -> u
 
 #[cfg(test)]
 mod tests {
-    use super::coinbase_outputs;
+    use super::{coinbase_job, coinbase_outputs};
+
+    #[test]
+    fn empty_address_list_does_not_issue_work() {
+        let body = coinbase_job(&[], 312_500_000, 300, None, "mainnet").unwrap();
+        assert_eq!(body["issue_work"], false);
+        assert!(body["outputs"].as_array().unwrap().is_empty());
+    }
 
     #[test]
     fn coinbase_rows_use_slot_zero_then_support_then_shared() {
@@ -92,6 +99,35 @@ pub fn coinbase_outputs(
         rows.push(coinbase_row(value, address, network)?);
     }
     Ok(rows)
+}
+
+/// Coinbase rows for the live job. Fee is 0: this node's template adds its own
+/// fees to output 0. An empty address list does not invent a coinbase.
+pub fn coinbase_job(
+    addresses: &[String],
+    subsidy_sats: u64,
+    total_slots: u64,
+    support_address: Option<&str>,
+    network: &str,
+) -> Result<serde_json::Value, String> {
+    if addresses.is_empty() {
+        return Ok(serde_json::json!({
+            "outputs": [],
+            "issue_work": false,
+        }));
+    }
+    let rows = coinbase_outputs(
+        addresses,
+        subsidy_sats,
+        0,
+        total_slots,
+        support_address,
+        network,
+    )?;
+    Ok(serde_json::json!({
+        "outputs": rows,
+        "issue_work": true,
+    }))
 }
 
 fn coinbase_row(value_sats: u64, address: &str, network: &str) -> Result<CoinbaseRow, String> {
