@@ -1,0 +1,417 @@
+name: CI
+# Module CI (crates.io resolution; rebuild 2026-06-17)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  CARGO_INCREMENTAL: "1"
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: [self-hosted, Linux, X64, builds]
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null ||
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]')))
+    outputs:
+      cache-key: ${{ steps.cache.outputs.cache-key }}
+    steps:
+      - name: Disk check
+        uses: BTCDecoded/rust-ci/runner-disk-guard@main
+
+      - uses: actions/checkout@v6
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - id: cache
+        name: Cache key
+        run: |
+          DEPS_KEY=$(sha256sum Cargo.toml | cut -d' ' -f1)
+          TOOLCHAIN=$(grep -E '^channel|rust-version' rust-toolchain.toml Cargo.toml 2>/dev/null | head -1 | sha256sum | cut -d' ' -f1 || echo "stable")
+          CACHE_KEY="${DEPS_KEY}-${TOOLCHAIN}"
+          echo "cache-key=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+          CACHE_ROOT="/tmp/runner-cache"
+          mkdir -p "$CACHE_ROOT/cargo/$CACHE_KEY"/{registry,git} "$CACHE_ROOT/target/$CACHE_KEY"
+
+  quality:
+    name: Quality (fmt, clippy, test)
+    needs: setup
+    runs-on: [self-hosted, Linux, X64, builds]
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null ||
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]')))
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Job-local HOME (Linux; avoid rustc ETXTBSY on shared rustup installs)
+        run: |
+          mkdir -p "${RUNNER_TEMP}/blvm-gridpool-ci-home"
+          echo "HOME=${RUNNER_TEMP}/blvm-gridpool-ci-home" >> "$GITHUB_ENV"
+
+      - name: Cache bind env (Linux self-hosted)
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}-quality
+
+      - name: Restore Cargo cache (Linux self-hosted)
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: restore
+
+      - name: Install Rust (Linux self-hosted)
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.88.0
+
+      - name: Regenerate lockfile for crates.io graph
+        shell: bash
+        run: |
+          rm -f Cargo.lock
+          cargo generate-lockfile
+
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --all-targets --features module -- -D warnings
+
+      - name: test
+        run: cargo test --all-targets --features module
+
+      - name: Save Cargo cache (Linux self-hosted)
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
+
+      - name: Prune old runner caches (Linux self-hosted)
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: prune
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: setup
+    runs-on: ${{ matrix.runs_on }}
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null ||
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]')))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runs_on: [self-hosted, Linux, X64, builds]
+            use_cross: false
+          - target: aarch64-unknown-linux-gnu
+            runs_on: [self-hosted, Linux, X64, builds]
+            use_cross: true
+          - target: x86_64-pc-windows-msvc
+            runs_on: windows-2022
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Job-local HOME (Linux; avoid rustc ETXTBSY on shared rustup installs)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "${RUNNER_TEMP}/blvm-gridpool-ci-home"
+          echo "HOME=${RUNNER_TEMP}/blvm-gridpool-ci-home" >> "$GITHUB_ENV"
+
+      - name: Cache bind env (Linux self-hosted)
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}-${{ matrix.target }}
+
+      - name: Restore Cargo cache (Linux self-hosted)
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: restore
+
+      - name: Install Rust (Linux self-hosted)
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.88.0
+
+      - name: Install Rust (Windows)
+        if: runner.os == 'Windows'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Add Rust target (pinned toolchain)
+        if: runner.os == 'Linux'
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Regenerate lockfile for crates.io graph
+        shell: bash
+        run: |
+          rm -f Cargo.lock
+          cargo generate-lockfile
+
+      - name: Install cross (aarch64 Linux)
+        if: matrix.use_cross
+        run: cargo install cross --locked
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --features module --target ${{ matrix.target }}
+          else
+            cargo build --release --features module --target ${{ matrix.target }}
+          fi
+
+      # pwsh: Git Bash puts Git/usr/bin first, so `link.exe` is the wrong binary (MSVC vs GNU).
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cargo build --release --features module --target ${{ matrix.target }}
+
+      - name: Save Cargo cache (Linux self-hosted)
+        if: always() && runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
+
+      - name: Prune old runner caches (Linux self-hosted)
+        if: always() && runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: prune
+
+  publish:
+    name: Release & publish
+    needs: [quality, build]
+    runs-on: [self-hosted, Linux, X64, builds]
+    if: |
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'push' || github.event.head_commit == null ||
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]') &&
+        !contains(github.event.head_commit.message, '[skip publish]')))
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Clean CARGO_HOME (skip runner global rustflags)
+        run: |
+          CI_CARGO_HOME="${RUNNER_TEMP:-/tmp}/cargo-home-ci"
+          mkdir -p "$CI_CARGO_HOME"
+          [ -d "$HOME/.cargo/registry" ] && ln -sfn "$HOME/.cargo/registry" "$CI_CARGO_HOME/registry"
+          [ -d "$HOME/.cargo/git" ] && ln -sfn "$HOME/.cargo/git" "$CI_CARGO_HOME/git"
+          echo "CARGO_HOME=$CI_CARGO_HOME" >> "$GITHUB_ENV"
+
+      - name: Check for crates.io token
+        id: gate
+        run: |
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "CARGO_REGISTRY_TOKEN not set, skipping release and crates.io publish"
+            echo "do_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if awk '/^\[package\]/{p=1; next} /^\[/{p=0} p && /^publish = false/{found=1} END{exit !found}' Cargo.toml; then
+            echo "Cargo.toml sets publish = false, skipping crates.io publish"
+            echo "do_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "do_release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Sync with origin before release steps
+        if: steps.gate.outputs.do_release == 'true'
+        run: |
+          git fetch origin "${{ github.ref_name }}"
+          git rebase "origin/${{ github.ref_name }}"
+
+      - name: Install Rust
+        if: steps.gate.outputs.do_release == 'true'
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.88.0
+
+      - name: Determine version
+        if: steps.gate.outputs.do_release == 'true'
+        id: version
+        run: |
+          CURRENT=$(grep -A 10 '^\[package\]' Cargo.toml | grep '^version = ' | head -1 | sed -E 's/^version = "([^"]+)".*/\1/')
+          if [ -z "$CURRENT" ]; then
+            echo "Could not read version from [package] in Cargo.toml"
+            exit 1
+          fi
+          if ! echo "$CURRENT" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid version format: ${CURRENT} (expected X.Y.Z)"
+            exit 1
+          fi
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          CRATE_NAME=$(grep -A 5 '^\[package\]' Cargo.toml | grep '^name = ' | head -1 | sed -E 's/^name = "([^"]+)".*/\1/')
+          echo "Fetching published versions for ${CRATE_NAME} from crates.io..."
+          API_RESPONSE=$(curl -sf \
+            -H "User-Agent: blvm-ci/1.0 (github.com/BTCDecoded)" \
+            "https://crates.io/api/v1/crates/${CRATE_NAME}/versions" 2>/dev/null || echo "")
+          PUBLISHED_VERSIONS=""
+          if [ -n "$API_RESPONSE" ] && ! echo "$API_RESPONSE" | grep -q '"detail"'; then
+            if command -v jq &>/dev/null; then
+              PUBLISHED_VERSIONS=$(echo "$API_RESPONSE" | jq -r '.versions[].num' 2>/dev/null || echo "")
+            else
+              PUBLISHED_VERSIONS=$(echo "$API_RESPONSE" | grep -oE '"num":"[^"]+"' | sed 's/"num":"//;s/"//')
+            fi
+          fi
+          TAGGED_VERSIONS=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | sed 's/-unverified$//')
+          USED_VERSIONS=$(printf '%s\n%s' "$TAGGED_VERSIONS" "$PUBLISHED_VERSIONS" | sort -u | grep -v '^$' || true)
+          SAME_LINE_PATCHES=$(printf '%s\n' "$USED_VERSIONS" | grep -E "^${MAJOR}\\.${MINOR}\\.[0-9]+$" | cut -d. -f3 || true)
+          MAX_PATCH=$(printf '%s\n' $SAME_LINE_PATCHES "$CURRENT_PATCH" | grep -E '^[0-9]+$' | sort -n | tail -1)
+          [ -n "$MAX_PATCH" ] || MAX_PATCH="$CURRENT_PATCH"
+          PATCH=$((MAX_PATCH + 1))
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          while echo "$USED_VERSIONS" | grep -qxF "$VERSION"; do
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          done
+          echo "Version ${VERSION} is available"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in Cargo.toml
+        if: steps.gate.outputs.do_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          awk -v ver="$VERSION" '
+            /^\[package\]/ { in_package = 1; print; next }
+            /^\[/ { in_package = 0 }
+            in_package && /^version = / {
+              print "version = \"" ver "\""
+              next
+            }
+            { print }
+          ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+          cp Cargo.toml "${RUNNER_TEMP}/Cargo.toml.with-patch"
+
+      - name: Strip [patch.crates-io] for the smoke test
+        if: steps.gate.outputs.do_release == 'true'
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Pre-release smoke test
+        if: steps.gate.outputs.do_release == 'true'
+        run: |
+          rm -f Cargo.lock
+          cargo test --all-targets --features module -- --test-threads=1
+
+      - name: Restore patched Cargo.toml and commit the version bump
+        if: steps.gate.outputs.do_release == 'true'
+        run: |
+          cp "${RUNNER_TEMP}/Cargo.toml.with-patch" Cargo.toml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          if git diff --staged --quiet; then
+            echo "No Cargo.toml changes to commit"
+          else
+            git commit -m "Bump version to ${{ steps.version.outputs.version }} for release [skip ci]"
+            if [ -n "${{ secrets.REPO_ACCESS_TOKEN }}" ]; then
+              git remote set-url origin "https://${{ secrets.REPO_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git"
+              git fetch origin "${{ github.ref_name }}"
+              git rebase "origin/${{ github.ref_name }}"
+              git push origin "HEAD:${{ github.ref_name }}"
+            else
+              echo "REPO_ACCESS_TOKEN not set — cannot push version bump"
+              exit 1
+            fi
+          fi
+
+      - name: Strip [patch.crates-io] for publish
+        if: steps.gate.outputs.do_release == 'true'
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Configure cargo for crates.io
+        if: steps.gate.outputs.do_release == 'true'
+        run: cargo login "${CARGO_REGISTRY_TOKEN}"
+
+      - name: Dry-run publish
+        if: steps.gate.outputs.do_release == 'true'
+        run: cargo publish --dry-run --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Check if version already on crates.io
+        if: steps.gate.outputs.do_release == 'true'
+        id: check-version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CRATE_NAME=$(grep -E '^name = ' Cargo.toml | head -1 | sed -E 's/^name = "([^"]+)".*/\1/')
+          API_RESPONSE=""
+          for i in 1 2 3; do
+            API_RESPONSE=$(curl -s --max-time 10 \
+              -H "User-Agent: blvm-ci/1.0 (github.com/BTCDecoded)" \
+              "https://crates.io/api/v1/crates/${CRATE_NAME}/versions" 2>/dev/null || echo "")
+            [ -n "$API_RESPONSE" ] && ! echo "$API_RESPONSE" | grep -q '"detail"' && break
+            [ "$i" -lt 3 ] && sleep $((i * 2))
+          done
+          if [ -z "$API_RESPONSE" ] || echo "$API_RESPONSE" | grep -q '"detail"'; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          elif command -v jq &>/dev/null; then
+            V=$(echo "$API_RESPONSE" | jq -r ".versions[] | select(.num == \"${VERSION}\") | .num" | head -1)
+            if [ "$V" = "$VERSION" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+          elif echo "$API_RESPONSE" | grep -q "\"num\":\"${VERSION}\""; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to crates.io
+        if: steps.gate.outputs.do_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ACTUAL=$(grep -A 10 '^\[package\]' Cargo.toml | grep '^version = ' | head -1 | sed -E 's/^version = "([^"]+)".*/\1/')
+          if [ "$ACTUAL" != "$VERSION" ]; then
+            echo "Version mismatch: expected ${VERSION}, got ${ACTUAL}"
+            exit 1
+          fi
+          if [ "${{ steps.check-version.outputs.exists }}" = "true" ]; then
+            echo "Version ${VERSION} already on crates.io, skipping publish"
+            exit 0
+          fi
+          if grep -q '^\[patch\.crates-io\]' Cargo.toml; then
+            echo "patch.crates-io is still present; refusing to publish"
+            exit 1
+          fi
+          cargo publish --allow-dirty --token "${CARGO_REGISTRY_TOKEN}"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
