@@ -1,0 +1,4 @@
+# CI regenerates Cargo.lock on the 1.88 toolchain. Keep crates whose rust-version
+# is newer than this package MSRV out of that resolve.
+[resolver]
+incompatible-rust-versions = "fallback"
