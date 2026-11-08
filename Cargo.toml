@@ -2,7 +2,7 @@
 name = "blvm-gridpool"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 authors = ["Bitcoin Commons Contributors"]
 description = "GridPool consensus-22 library pinned to boot-protocol develop be0f0b16"
 license = "MIT"
