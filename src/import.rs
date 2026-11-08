@@ -375,24 +375,45 @@ pub fn bootstrap_current(
     Ok((winners.to_vec(), sort_and_trim(&validated, limit)))
 }
 
-pub fn import_candidate(
-    local_version: &VersionFields,
-    remote_version: &VersionFields,
-    local_network_id: &str,
-    remote_network_id: &str,
-    current_state_id: &str,
-    claimed_state_id: &str,
-    payout_variant: &str,
-    local: &[DeckProof],
-    remote: &[DeckProof],
-    current_tip: Option<&str>,
-    limit: usize,
-    verifier_winners: &[ExpectedWinner],
-    claimed_winners: &[WinnerRow],
-    math: &PayoutMath,
-    local_parents: &[String],
-    remote_parents: &[String],
-) -> Result<Vec<DeckProof>, ImportError> {
+#[derive(Copy, Clone)]
+pub struct CandidateImport<'a> {
+    pub local_version: &'a VersionFields,
+    pub remote_version: &'a VersionFields,
+    pub local_network_id: &'a str,
+    pub remote_network_id: &'a str,
+    pub current_state_id: &'a str,
+    pub claimed_state_id: &'a str,
+    pub payout_variant: &'a str,
+    pub local: &'a [DeckProof],
+    pub remote: &'a [DeckProof],
+    pub current_tip: Option<&'a str>,
+    pub limit: usize,
+    pub verifier_winners: &'a [ExpectedWinner],
+    pub claimed_winners: &'a [WinnerRow],
+    pub math: &'a PayoutMath,
+    pub local_parents: &'a [String],
+    pub remote_parents: &'a [String],
+}
+
+pub fn import_candidate(import: &CandidateImport<'_>) -> Result<Vec<DeckProof>, ImportError> {
+    let CandidateImport {
+        local_version,
+        remote_version,
+        local_network_id,
+        remote_network_id,
+        current_state_id,
+        claimed_state_id,
+        payout_variant,
+        local,
+        remote,
+        current_tip,
+        limit,
+        verifier_winners,
+        claimed_winners,
+        math,
+        local_parents,
+        remote_parents,
+    } = *import;
     if !can_sync_state(
         local_version,
         remote_version,
@@ -434,27 +455,53 @@ pub fn import_candidate(
     ))
 }
 
+#[derive(Copy, Clone)]
+pub struct LockedSiblingImport<'a> {
+    pub family: &'a FamilyState,
+    pub member: &'a FamilyMember,
+    pub local_reconciled: &'a [ShareProof],
+    pub boundary: &'a [DeckProof],
+    pub paid_ids: &'a [String],
+    pub on_deck: &'a [ShareProof],
+    pub reserve_limit: usize,
+    pub math: &'a PayoutMath,
+    pub network_id: &'a str,
+    pub payout_variant: &'a str,
+    pub claimed_snapshot_id: &'a str,
+    pub active_snapshot_id: &'a str,
+    pub local_tip: &'a str,
+    pub local_tip_height: i64,
+    pub local_support_enabled: bool,
+    pub remote_support_enabled: bool,
+    pub verifier_winners: &'a [ExpectedWinner],
+    pub claimed_winners: &'a [WinnerRow],
+    pub parents: &'a [String],
+}
+
 pub fn import_locked_sibling(
-    family: &FamilyState,
-    member: &FamilyMember,
-    local_reconciled: &[ShareProof],
-    boundary: &[DeckProof],
-    paid_ids: &[String],
-    on_deck: &[ShareProof],
-    reserve_limit: usize,
-    math: &PayoutMath,
-    network_id: &str,
-    payout_variant: &str,
-    claimed_snapshot_id: &str,
-    active_snapshot_id: &str,
-    local_tip: &str,
-    local_tip_height: i64,
-    local_support_enabled: bool,
-    remote_support_enabled: bool,
-    verifier_winners: &[ExpectedWinner],
-    claimed_winners: &[WinnerRow],
-    parents: &[String],
+    import: &LockedSiblingImport<'_>,
 ) -> Result<AdoptOutcome, ImportError> {
+    let LockedSiblingImport {
+        family,
+        member,
+        local_reconciled,
+        boundary,
+        paid_ids,
+        on_deck,
+        reserve_limit,
+        math,
+        network_id,
+        payout_variant,
+        claimed_snapshot_id,
+        active_snapshot_id,
+        local_tip,
+        local_tip_height,
+        local_support_enabled,
+        remote_support_enabled,
+        verifier_winners,
+        claimed_winners,
+        parents,
+    } = *import;
     if family.consensus_version != CONSENSUS_VERSION
         || !matches_family(family, member)
         || !payout_variant.eq_ignore_ascii_case(&member.payout_variant)
@@ -484,34 +531,34 @@ pub fn import_locked_sibling(
         });
         known.truncate(reserve_limit);
         let snapshot = decks_for_shares(&known, boundary, math.shared_slots);
-        return check_member_snapshot(
+        return check_member_snapshot(&MemberSnapshot {
             family,
-            &snapshot,
+            snapshot: &snapshot,
             network_id,
             payout_variant,
-            &member.boundary_block_hash,
+            boundary_hash: &member.boundary_block_hash,
             claimed_snapshot_id,
             active_snapshot_id,
             math,
             claimed_winners,
-        )
+        })
         .map(|()| AdoptOutcome::Unchanged);
     }
     let validated = validate_imported(boundary, verifier_winners, parents, &math.network)?;
     let boundary_shares = share_proofs(&validated);
     let member_reserve = reconcile(&[], &boundary_shares, paid_ids, reserve_limit);
     let member_snapshot = decks_for_shares(&member_reserve, &validated, math.shared_slots);
-    check_member_snapshot(
+    check_member_snapshot(&MemberSnapshot {
         family,
-        &member_snapshot,
+        snapshot: &member_snapshot,
         network_id,
         payout_variant,
-        &member.boundary_block_hash,
+        boundary_hash: &member.boundary_block_hash,
         claimed_snapshot_id,
         active_snapshot_id,
         math,
         claimed_winners,
-    )?;
+    })?;
     let reconciled = reconcile(local_reconciled, &boundary_shares, paid_ids, reserve_limit);
     let on_deck = reconcile(on_deck, &reconciled, paid_ids, reserve_limit);
     Ok(AdoptOutcome::Reconciled {
@@ -520,17 +567,31 @@ pub fn import_locked_sibling(
     })
 }
 
-fn check_member_snapshot(
-    family: &FamilyState,
-    snapshot: &[DeckProof],
-    network_id: &str,
-    payout_variant: &str,
-    boundary_hash: &str,
-    claimed_snapshot_id: &str,
-    active_snapshot_id: &str,
-    math: &PayoutMath,
-    claimed_winners: &[WinnerRow],
-) -> Result<(), ImportError> {
+#[derive(Copy, Clone)]
+struct MemberSnapshot<'a> {
+    family: &'a FamilyState,
+    snapshot: &'a [DeckProof],
+    network_id: &'a str,
+    payout_variant: &'a str,
+    boundary_hash: &'a str,
+    claimed_snapshot_id: &'a str,
+    active_snapshot_id: &'a str,
+    math: &'a PayoutMath,
+    claimed_winners: &'a [WinnerRow],
+}
+
+fn check_member_snapshot(check: &MemberSnapshot<'_>) -> Result<(), ImportError> {
+    let MemberSnapshot {
+        family,
+        snapshot,
+        network_id,
+        payout_variant,
+        boundary_hash,
+        claimed_snapshot_id,
+        active_snapshot_id,
+        math,
+        claimed_winners,
+    } = *check;
     let expected = compute_state_id(
         family.consensus_version,
         network_id,

@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use crate::family::{FamilyId, FamilyMember, FamilyState, CONSENSUS_VERSION};
 use crate::import::{
     bootstrap_current, can_sync_state, import_candidate, import_locked_sibling,
-    should_fetch_remote_current_state, AdoptOutcome, DeckProof, PayoutMath, PollSnapshot,
-    VersionFields, WinnerRow, HTTP_API_VERSION, PEER_TRANSPORT_VERSION,
-    STATE_BUNDLE_SCHEMA_VERSION,
+    should_fetch_remote_current_state, AdoptOutcome, CandidateImport, DeckProof,
+    LockedSiblingImport, PayoutMath, PollSnapshot, VersionFields, WinnerRow, HTTP_API_VERSION,
+    PEER_TRANSPORT_VERSION, STATE_BUNDLE_SCHEMA_VERSION,
 };
 use crate::reconcile::ShareProof;
 use crate::verify::ExpectedWinner;
@@ -179,15 +179,13 @@ fn handle_client(mut stream: TcpStream, books: &Arc<Mutex<PeerBooks>>) {
             ),
             None => (404, String::new()),
         }
-    } else if path.starts_with("/api/network/peer-addresses") {
-        (404, String::new())
     } else {
         (404, String::new())
     };
     let reason = if status == 200 { "OK" } else { "Not Found" };
+    let len = body.len();
     let response = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {len}\r\nConnection: close\r\n\r\n{body}"
     );
     let _ = stream.write_all(response.as_bytes());
 }
@@ -460,24 +458,24 @@ pub fn poll_peer(address: &str, local: &LocalSync) -> std::io::Result<PollOutcom
         if let Ok(bundle) = serde_json::from_str::<StateBundle>(&body) {
             let remote_proofs = candidate_proofs(&bundle);
             let parents = bundle_parents(&bundle, &remote_proofs);
-            if let Ok(merged) = import_candidate(
-                &local.version,
-                &bundle_version(&bundle),
-                &local.network_id,
-                &bundle.network_id,
-                &outcome.current_state_id,
-                &bundle.state_id,
-                &bundle.payout_variant,
-                &outcome.on_deck,
-                &remote_proofs,
-                Some(&local.tip),
-                local.reserve_limit,
-                &verifier_winners(&bundle, &outcome.winners),
-                &winner_rows(&bundle.winners_list),
-                &local.math,
-                &local.parents,
-                &parents,
-            ) {
+            if let Ok(merged) = import_candidate(&CandidateImport {
+                local_version: &local.version,
+                remote_version: &bundle_version(&bundle),
+                local_network_id: &local.network_id,
+                remote_network_id: &bundle.network_id,
+                current_state_id: &outcome.current_state_id,
+                claimed_state_id: &bundle.state_id,
+                payout_variant: &bundle.payout_variant,
+                local: &outcome.on_deck,
+                remote: &remote_proofs,
+                current_tip: Some(&local.tip),
+                limit: local.reserve_limit,
+                verifier_winners: &verifier_winners(&bundle, &outcome.winners),
+                claimed_winners: &winner_rows(&bundle.winners_list),
+                math: &local.math,
+                local_parents: &local.parents,
+                remote_parents: &parents,
+            }) {
                 outcome.on_deck = merged;
                 outcome.candidate_state_id = bundle.state_id;
                 outcome.stopped = false;
@@ -522,39 +520,41 @@ fn adopt_bundle(
         .collect::<Vec<_>>();
     let mut parents = bundle_parents(bundle, &boundary);
     parents.push(local.tip.clone());
-    import_locked_sibling(
+    let paid = if bundle.paid_snapshot_proof_ids.is_empty() {
+        paid_ids
+    } else {
+        &bundle.paid_snapshot_proof_ids
+    };
+    let family_member = FamilyMember {
+        family_id: FamilyId(member.family_id.clone()),
+        consensus_version: member.consensus_version,
+        network_id: member.network_id.clone(),
+        predecessor_snapshot_id: member.predecessor_snapshot_id.clone(),
+        boundary_block_hash: member.boundary_block_hash.clone(),
+        boundary_block_height: member.boundary_block_height,
+        payout_variant: member.payout_variant.clone(),
+    };
+    import_locked_sibling(&LockedSiblingImport {
         family,
-        &FamilyMember {
-            family_id: FamilyId(member.family_id.clone()),
-            consensus_version: member.consensus_version,
-            network_id: member.network_id.clone(),
-            predecessor_snapshot_id: member.predecessor_snapshot_id.clone(),
-            boundary_block_hash: member.boundary_block_hash.clone(),
-            boundary_block_height: member.boundary_block_height,
-            payout_variant: member.payout_variant.clone(),
-        },
-        &outcome.reconciled,
-        &boundary,
-        if bundle.paid_snapshot_proof_ids.is_empty() {
-            paid_ids
-        } else {
-            &bundle.paid_snapshot_proof_ids
-        },
-        on_deck_shares,
-        local.reserve_limit,
-        &local.math,
-        &bundle.network_id,
-        &bundle.payout_variant,
-        &member.snapshot_id,
-        &bundle.active_snapshot_id,
-        &local.tip,
-        local.tip_height,
-        local.support_enabled,
-        bundle.support_fee_enabled,
-        &verifier_winners(bundle, &outcome.winners),
-        &winner_rows(&bundle.winners_list),
-        &parents,
-    )
+        member: &family_member,
+        local_reconciled: &outcome.reconciled,
+        boundary: &boundary,
+        paid_ids: paid,
+        on_deck: on_deck_shares,
+        reserve_limit: local.reserve_limit,
+        math: &local.math,
+        network_id: &bundle.network_id,
+        payout_variant: &bundle.payout_variant,
+        claimed_snapshot_id: &member.snapshot_id,
+        active_snapshot_id: &bundle.active_snapshot_id,
+        local_tip: &local.tip,
+        local_tip_height: local.tip_height,
+        local_support_enabled: local.support_enabled,
+        remote_support_enabled: bundle.support_fee_enabled,
+        verifier_winners: &verifier_winners(bundle, &outcome.winners),
+        claimed_winners: &winner_rows(&bundle.winners_list),
+        parents: &parents,
+    })
     .ok()
 }
 

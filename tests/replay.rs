@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 
 use blvm_gridpool::{
     can_sync_state, decks_of, expected_winners_from_coinbase, http_get, import_candidate,
-    import_locked_sibling, poll_peer, AdoptOutcome, BundleProof, FamilyId, FamilyMember,
-    FamilyState, LocalSync, NetworkSummary, PayoutMath, PeerBooks, PeerServer, PollOutcome,
-    PollSnapshot, ShareProof, StateBundle, VersionFields, WinnerRow, CONSENSUS_VERSION,
-    HTTP_API_VERSION, STATE_BUNDLE_SCHEMA_VERSION,
+    import_locked_sibling, poll_peer, AdoptOutcome, BundleProof, CandidateImport, FamilyId,
+    FamilyMember, FamilyState, LocalSync, LockedSiblingImport, NetworkSummary, PayoutMath,
+    PeerBooks, PeerServer, PollOutcome, PollSnapshot, ShareProof, StateBundle, VersionFields,
+    WinnerRow, CONSENSUS_VERSION, HTTP_API_VERSION, STATE_BUNDLE_SCHEMA_VERSION,
 };
 
 const RECONCILED: &[&str] = &["537c2cdb8dffd914b099b7a83423cafea4ede16152d42d6600272b89a5537c5f"];
@@ -137,27 +137,29 @@ fn adopt(
     let boundary = bundle.boundary_decks();
     let local_decks = decks_of(&local.proofs);
     let winners = expected_winners_from_coinbase(&boundary[0].coinbase_hex, "mainnet");
-    import_locked_sibling(
+    let math = locked_math();
+    let local_shares = shares(&local_decks);
+    import_locked_sibling(&LockedSiblingImport {
         family,
         member,
-        &shares(&local_decks),
-        &boundary,
-        &local.paid_ids,
-        &shares(&local_decks),
-        3,
-        &locked_math(),
-        &bundle.network_id,
-        &bundle.payout_variant,
-        claimed_snapshot,
-        &bundle.active_snapshot_id,
-        &local.tip,
-        local.height,
-        false,
-        bundle.support_fee_enabled,
-        &winners,
+        local_reconciled: &local_shares,
+        boundary: &boundary,
+        paid_ids: &local.paid_ids,
+        on_deck: &local_shares,
+        reserve_limit: 3,
+        math: &math,
+        network_id: &bundle.network_id,
+        payout_variant: &bundle.payout_variant,
+        claimed_snapshot_id: claimed_snapshot,
+        active_snapshot_id: &bundle.active_snapshot_id,
+        local_tip: &local.tip,
+        local_tip_height: local.height,
+        local_support_enabled: false,
+        remote_support_enabled: bundle.support_fee_enabled,
+        verifier_winners: &winners,
         claimed_winners,
-        &bundle.valid_parent_block_hashes,
-    )
+        parents: &bundle.valid_parent_block_hashes,
+    })
 }
 
 #[test]
@@ -194,27 +196,31 @@ fn locked_sibling_matches_the_captured_order_and_paid_ids() {
         .iter()
         .any(|paid| reconciled.iter().any(|proof| proof.share_id == *paid)));
 
-    let again = import_locked_sibling(
-        &family,
-        &member,
-        &reconciled,
-        &bundle.boundary_decks(),
-        &local.paid_ids,
-        &on_deck,
-        3,
-        &locked_math(),
-        &bundle.network_id,
-        &bundle.payout_variant,
-        &member_id,
-        &bundle.active_snapshot_id,
-        &local.tip,
-        local.height,
-        false,
-        bundle.support_fee_enabled,
-        &expected_winners_from_coinbase(&bundle.boundary_decks()[0].coinbase_hex, "mainnet"),
-        &rows(&bundle),
-        &bundle.valid_parent_block_hashes,
-    )
+    let again_math = locked_math();
+    let again_boundary = bundle.boundary_decks();
+    let again_winners = expected_winners_from_coinbase(&again_boundary[0].coinbase_hex, "mainnet");
+    let again_rows = rows(&bundle);
+    let again = import_locked_sibling(&LockedSiblingImport {
+        family: &family,
+        member: &member,
+        local_reconciled: &reconciled,
+        boundary: &again_boundary,
+        paid_ids: &local.paid_ids,
+        on_deck: &on_deck,
+        reserve_limit: 3,
+        math: &again_math,
+        network_id: &bundle.network_id,
+        payout_variant: &bundle.payout_variant,
+        claimed_snapshot_id: &member_id,
+        active_snapshot_id: &bundle.active_snapshot_id,
+        local_tip: &local.tip,
+        local_tip_height: local.height,
+        local_support_enabled: false,
+        remote_support_enabled: bundle.support_fee_enabled,
+        verifier_winners: &again_winners,
+        claimed_winners: &again_rows,
+        parents: &bundle.valid_parent_block_hashes,
+    })
     .expect("second adopt");
     match again {
         AdoptOutcome::Unchanged => {}
@@ -265,27 +271,32 @@ fn candidate_merge_matches_the_captured_ids_without_reconcile() {
         network: "mainnet".into(),
     };
     let winners = expected_winners_from_coinbase(&remote[0].coinbase_hex, "mainnet");
-    let merged = import_candidate(
-        &version_of(&bundle),
-        &version_of(&bundle),
-        &bundle.network_id,
-        &bundle.network_id,
-        "seed-current",
-        &bundle.state_id,
-        &bundle.payout_variant,
-        &local_decks,
-        &remote,
-        Some(&local.tip),
-        12,
-        &winners,
-        &rows(&bundle),
-        &math,
-        &[local.tip.clone()],
-        &remote
-            .iter()
-            .map(|proof| proof.prev_block_hash.clone())
-            .collect::<Vec<_>>(),
-    )
+    let local_version = version_of(&bundle);
+    let remote_version = version_of(&bundle);
+    let claimed_rows = rows(&bundle);
+    let local_parents = [local.tip.clone()];
+    let remote_parents = remote
+        .iter()
+        .map(|proof| proof.prev_block_hash.clone())
+        .collect::<Vec<_>>();
+    let merged = import_candidate(&CandidateImport {
+        local_version: &local_version,
+        remote_version: &remote_version,
+        local_network_id: &bundle.network_id,
+        remote_network_id: &bundle.network_id,
+        current_state_id: "seed-current",
+        claimed_state_id: &bundle.state_id,
+        payout_variant: &bundle.payout_variant,
+        local: &local_decks,
+        remote: &remote,
+        current_tip: Some(&local.tip),
+        limit: 12,
+        verifier_winners: &winners,
+        claimed_winners: &claimed_rows,
+        math: &math,
+        local_parents: &local_parents,
+        remote_parents: &remote_parents,
+    })
     .expect("candidate");
     assert_eq!(deck_ids(&merged), CANDIDATE_IDS);
     let kept = merged

@@ -42,9 +42,10 @@ pub use follow::{
 pub use import::{
     bootstrap_current, can_sync_state, compute_candidate_state_id, compute_state_id,
     import_candidate, import_locked_sibling, merge_candidate_reserve, parent_sets_overlap,
-    payouts_from_proofs, should_fetch_remote_current_state, winners_match, AdoptOutcome, DeckProof,
-    ImportError, PayoutMath, PollSnapshot, VersionFields, WinnerRow, HTTP_API_VERSION,
-    PEER_TRANSPORT_VERSION, STATE_BUNDLE_SCHEMA_VERSION,
+    payouts_from_proofs, should_fetch_remote_current_state, winners_match, AdoptOutcome,
+    CandidateImport, DeckProof, ImportError, LockedSiblingImport, PayoutMath, PollSnapshot,
+    VersionFields, WinnerRow, HTTP_API_VERSION, PEER_TRANSPORT_VERSION,
+    STATE_BUNDLE_SCHEMA_VERSION,
 };
 pub use job::{
     canon_after_local_block, job_after_payment, pay_published_list, published_job, Canon,
