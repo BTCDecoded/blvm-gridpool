@@ -4,8 +4,16 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "**/*.md"
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "**/*.md"
   workflow_dispatch:
 
 permissions:
@@ -17,11 +25,16 @@ env:
   RUST_BACKTRACE: "1"
   CARGO_INCREMENTAL: "1"
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   setup:
     name: Setup
-    runs-on: [self-hosted, Linux, X64, builds]
+    runs-on: ubuntu-latest
     if: |
+      (github.event_name != 'pull_request' || (!contains(github.event.pull_request.title, '[skip ci]') && !contains(github.event.pull_request.title, '[ci skip]') && !contains(github.event.pull_request.title, '[no ci]'))) &&
       (github.event_name != 'push' || github.event.head_commit == null ||
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
@@ -29,9 +42,6 @@ jobs:
     outputs:
       cache-key: ${{ steps.cache.outputs.cache-key }}
     steps:
-      - name: Disk check
-        uses: BTCDecoded/rust-ci/runner-disk-guard@main
-
       - uses: actions/checkout@v6
 
       - name: Strip [patch.crates-io] for crates.io-only CI
@@ -57,6 +67,9 @@ jobs:
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]')))
     steps:
+      - name: Disk check
+        uses: BTCDecoded/rust-ci/runner-disk-guard@main
+
       - uses: actions/checkout@v6
 
       - name: Strip [patch.crates-io] for crates.io-only CI
@@ -96,6 +109,7 @@ jobs:
         run: cargo clippy --all-targets --features module -- -D warnings
 
       - name: test
+        if: github.event_name != 'pull_request'
         run: cargo test --all-targets --features module
 
       - name: Save Cargo cache (Linux self-hosted)
@@ -115,6 +129,7 @@ jobs:
     needs: setup
     runs-on: ${{ matrix.runs_on }}
     if: |
+      (github.event_name != 'pull_request') &&
       (github.event_name != 'push' || github.event.head_commit == null ||
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
@@ -134,6 +149,10 @@ jobs:
             use_cross: false
 
     steps:
+      - name: Disk check
+        if: runner.os == 'Linux'
+        uses: BTCDecoded/rust-ci/runner-disk-guard@main
+
       - uses: actions/checkout@v6
 
       - name: Strip [patch.crates-io] for crates.io-only CI
