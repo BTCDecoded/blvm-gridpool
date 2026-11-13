@@ -178,15 +178,15 @@ impl Follower {
 }
 
 /// Host and port for `poll_peer`. An empty URL does not poll.
+///
+/// `https://` is refused. The poll is a cleartext TCP GET, and stripping the
+/// scheme used to send that GET to the host named in an HTTPS URL.
 pub fn peer_address(peer_url: &str) -> Option<String> {
     let url = peer_url.trim();
-    if url.is_empty() {
+    if url.is_empty() || url.to_ascii_lowercase().starts_with("https://") {
         return None;
     }
-    let rest = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-        .unwrap_or(url);
+    let rest = url.strip_prefix("http://").unwrap_or(url);
     let host = rest.split('/').next().unwrap_or("").trim();
     if host.is_empty() {
         return None;
@@ -452,6 +452,8 @@ mod tests {
             peer_address(&config.peer_url).as_deref(),
             Some("127.0.0.1:9")
         );
+        assert_eq!(peer_address("https://127.0.0.1:9"), None);
+        assert_eq!(peer_address("HTTPS://pool.example:443"), None);
         let _ = std::fs::remove_file(dir.join("config.toml"));
         let _ = std::fs::remove_dir(&dir);
     }

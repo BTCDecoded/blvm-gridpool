@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::family::{FamilyId, FamilyMember, FamilyState, CONSENSUS_VERSION};
+use crate::family::{
+    snapshot_proof_slot_count, work_set_reserve_limit, FamilyId, FamilyMember, FamilyState,
+    CONSENSUS_VERSION, REFERENCE_RESERVE_MULTIPLIER, REFERENCE_WINNERS_LIST_SIZE,
+};
 use crate::import::{
     bootstrap_current, can_sync_state, import_candidate, import_locked_sibling,
     should_fetch_remote_current_state, AdoptOutcome, CandidateImport, DeckProof,
@@ -190,13 +193,28 @@ fn handle_client(mut stream: TcpStream, books: &Arc<Mutex<PeerBooks>>) {
     let _ = stream.write_all(response.as_bytes());
 }
 
+/// 8 KiB is above one proof in the captured candidate bundle (the whole file
+/// is 19 KiB). The cap is that budget times the reference reserve.
+fn max_peer_body() -> usize {
+    let reserve = work_set_reserve_limit(
+        snapshot_proof_slot_count(REFERENCE_WINNERS_LIST_SIZE),
+        REFERENCE_RESERVE_MULTIPLIER,
+    );
+    usize::try_from(reserve.max(0)).unwrap_or(0) * (8 * 1024)
+}
+
 pub fn http_get(address: &str, path: &str) -> std::io::Result<(u16, String)> {
+    http_get_capped(address, path, max_peer_body())
+}
+
+fn http_get_capped(address: &str, path: &str, cap: usize) -> std::io::Result<(u16, String)> {
     let mut stream = TcpStream::connect(address)?;
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     let request = format!("GET {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n");
     stream.write_all(request.as_bytes())?;
-    let mut response = String::new();
-    stream.read_to_string(&mut response)?;
+    let bytes = read_capped(&mut stream, cap)?;
+    let response = String::from_utf8(bytes)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
     let status = response
         .split_whitespace()
         .nth(1)
@@ -207,6 +225,24 @@ pub fn http_get(address: &str, path: &str) -> std::io::Result<(u16, String)> {
         .map(|(_, body)| body.to_string())
         .unwrap_or_default();
     Ok((status, body))
+}
+
+fn read_capped(stream: &mut TcpStream, cap: usize) -> std::io::Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let n = stream.read(&mut chunk)?;
+        if n == 0 {
+            return Ok(buf);
+        }
+        if buf.len().saturating_add(n) > cap {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "peer response exceeds the reserve body budget",
+            ));
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
@@ -728,4 +764,27 @@ fn days_from_civil(year: i32, month: u32, day: u32) -> Option<i64> {
     let doy = (153 * month + 2) / 5 + day - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy as u64;
     Some(era as i64 * 146097 + doe as i64 - 719468)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+
+    #[test]
+    fn a_peer_body_over_the_budget_is_refused() {
+        let books = Arc::new(Mutex::new(PeerBooks {
+            summary: NetworkSummary::consensus_22("testnet", "http://127.0.0.1"),
+            bundles: HashMap::new(),
+        }));
+        let server = PeerServer::spawn(Arc::clone(&books)).expect("listen");
+        let error =
+            http_get_capped(&server.address, "/api/network/summary", 32).expect_err("over cap");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        let (status, body) = http_get(&server.address, "/api/network/summary").expect("under cap");
+        assert_eq!(status, 200);
+        assert!(body.contains("testnet"));
+    }
 }

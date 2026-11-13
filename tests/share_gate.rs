@@ -285,6 +285,19 @@ fn rewrite_header_merkle(header_hex: &str, coinbase_hex: &str, merkle: &[String]
 }
 
 #[test]
+fn an_empty_winner_list_does_not_match_the_coinbase() {
+    let result = validate_share(
+        &sample_submission(SAMPLE_HEADER, SAMPLE_COINBASE),
+        &[],
+        &[SAMPLE_PREV.into()],
+        "mainnet",
+    );
+    assert!(!result.valid);
+    let reason = result.reason.unwrap_or_default();
+    assert!(reason.contains("do not match"));
+}
+
+#[test]
 fn slot_zero_wins_over_a_claimed_miner_address() {
     let winners = expected_winners_from_coinbase(SAMPLE_COINBASE, "mainnet");
     let forged = validate_share(

@@ -276,7 +276,9 @@ fn winner_scripts(
 }
 
 fn matches_outputs(actual: &[&crate::bitcoin::TxOutput], expected: &[WinnerScript]) -> bool {
-    if actual.len() < expected.len() {
+    // An empty required list used to match every coinbase: `zip` is empty and
+    // `all` is true. Bootstrap then adopted whatever winner rows the peer sent.
+    if expected.is_empty() || actual.len() < expected.len() {
         return false;
     }
     expected.iter().enumerate().all(|(index, expected)| {
