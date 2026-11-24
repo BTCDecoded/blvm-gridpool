@@ -95,7 +95,7 @@ fn validate_core(
         return Err("Header must be exactly 80 bytes.".into());
     }
     let coinbase_hex = normalize_hex(&share.coinbase_hex);
-    if coinbase_hex.is_empty() || coinbase_hex.len() % 2 != 0 {
+    if coinbase_hex.is_empty() || !coinbase_hex.len().is_multiple_of(2) {
         return Err("Coinbase transaction hex is invalid.".into());
     }
     let header =

@@ -235,12 +235,12 @@ fn union_is_commutative_idempotent_and_associative() {
     let b = proof("b", 20.0);
     let c = proof("c", 20.0);
     let d = proof("d", 5.0);
-    let ab = reconcile(&[a.clone()], &[b.clone()], &[], 4);
-    let ba = reconcile(&[b.clone()], &[a.clone()], &[], 4);
+    let ab = reconcile(std::slice::from_ref(&a), std::slice::from_ref(&b), &[], 4);
+    let ba = reconcile(std::slice::from_ref(&b), std::slice::from_ref(&a), &[], 4);
     assert_eq!(ids(&ab), ids(&ba));
     assert_eq!(ids(&reconcile(&ab, &ab, &[], 4)), ids(&ab));
     let left = reconcile(
-        &reconcile(&[a.clone()], &[b.clone()], &[], 4),
+        &reconcile(std::slice::from_ref(&a), std::slice::from_ref(&b), &[], 4),
         &[c.clone(), d.clone()],
         &[],
         4,

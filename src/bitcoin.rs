@@ -19,7 +19,7 @@ pub fn normalize_hex(hex: &str) -> String {
 
 pub fn decode_hex(hex: &str) -> Result<Vec<u8>, String> {
     let normalized = normalize_hex(hex);
-    if normalized.len() % 2 != 0 {
+    if !normalized.len().is_multiple_of(2) {
         return Err("odd hex length".into());
     }
     (0..normalized.len())
@@ -43,7 +43,7 @@ pub fn encode_hex(bytes: &[u8]) -> String {
 
 pub fn reverse_hex(hex: &str) -> String {
     let normalized = normalize_hex(hex);
-    if normalized.len() % 2 != 0 {
+    if !normalized.len().is_multiple_of(2) {
         return normalized;
     }
     let mut out = String::with_capacity(normalized.len());
